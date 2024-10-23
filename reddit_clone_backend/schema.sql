@@ -1,22 +1,17 @@
 -- -----------------------------------------------------
 -- Schema reddit_clone
 -- -----------------------------------------------------
-
--- -----------------------------------------------------
--- Schema reddit_clone
--- -----------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS `reddit_clone` ;
-USE `reddit_clone` ;
+CREATE SCHEMA IF NOT EXISTS `reddit_clone`;
+USE `reddit_clone`;
 
 -- -----------------------------------------------------
 -- Table `reddit_clone`.`users`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `reddit_clone`.`users` ;
+DROP TABLE IF EXISTS `reddit_clone`.`users`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`users` (
   `id_user` INT NOT NULL AUTO_INCREMENT,
   `user_name` VARCHAR(100) NOT NULL,
-  `display_name` VARCHAR(200) NULL,
   `email` VARCHAR(320) NOT NULL,
   `hashed_password` VARCHAR(256) NOT NULL,
   PRIMARY KEY (`id_user`),
@@ -29,7 +24,7 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `reddit_clone`.`subreddits`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `reddit_clone`.`subreddits` ;
+DROP TABLE IF EXISTS `reddit_clone`.`subreddits`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`subreddits` (
   `id_subreddit` INT NOT NULL AUTO_INCREMENT,
@@ -41,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `reddit_clone`.`subreddits` (
   UNIQUE INDEX `id_UNIQUE` (`id_subreddit` ASC) VISIBLE,
   UNIQUE INDEX `name_UNIQUE` (`name` ASC) VISIBLE,
   UNIQUE INDEX `url_UNIQUE` (`url` ASC) VISIBLE,
-  INDEX `owner_idx` (`id_user` ASC) VISIBLE,
+  INDEX `users_idx` (`id_user` ASC) VISIBLE,
   CONSTRAINT `subreddits_owner`
     FOREIGN KEY (`id_user`)
     REFERENCES `reddit_clone`.`users` (`id_user`)
@@ -53,7 +48,7 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `reddit_clone`.`posts`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `reddit_clone`.`posts` ;
+DROP TABLE IF EXISTS `reddit_clone`.`posts`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`posts` (
   `id_post` INT NOT NULL AUTO_INCREMENT,
@@ -83,7 +78,7 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `reddit_clone`.`comments`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `reddit_clone`.`comments` ;
+DROP TABLE IF EXISTS `reddit_clone`.`comments`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`comments` (
   `id_comment` INT NOT NULL AUTO_INCREMENT,
@@ -96,7 +91,7 @@ CREATE TABLE IF NOT EXISTS `reddit_clone`.`comments` (
   UNIQUE INDEX `id_comment_UNIQUE` (`id_comment` ASC) VISIBLE,
   INDEX `posts_idx` (`id_post` ASC) VISIBLE,
   INDEX `users_idx` (`id_user` ASC) VISIBLE,
-  INDEX `comments_parent_idx` (`parent_id` ASC) VISIBLE,
+  INDEX `parent_idx` (`parent_id` ASC) VISIBLE,
   CONSTRAINT `comments_posts`
     FOREIGN KEY (`id_post`)
     REFERENCES `reddit_clone`.`posts` (`id_post`)
@@ -117,10 +112,11 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `reddit_clone`.`scores`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `reddit_clone`.`scores` ;
+DROP TABLE IF EXISTS `reddit_clone`.`scores`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`scores` (
   `id_score` INT NOT NULL AUTO_INCREMENT,
+  `score` INT NOT NULL DEFAULT 0,
   `id_post` INT,
   `id_comment` INT,
   `id_user` INT NOT NULL,
