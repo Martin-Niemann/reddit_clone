@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `reddit_clone`.`posts` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_post`),
-  UNIQUE INDEX `idposts_UNIQUE` (`id_post` ASC) VISIBLE,
+  UNIQUE INDEX `id_post_UNIQUE` (`id_post` ASC) VISIBLE,
   INDEX `users_idx` (`id_user` ASC) VISIBLE,
   CONSTRAINT `posts_subreddits`
     FOREIGN KEY (`id_subreddit`)
@@ -82,6 +82,7 @@ DROP TABLE IF EXISTS `reddit_clone`.`comments`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`comments` (
   `id_comment` INT NOT NULL AUTO_INCREMENT,
+  `comment` VARCHAR(10000) NOT NULL,
   `id_post` INT NOT NULL,
   `parent_id` INT NULL,
   `id_user` INT NOT NULL,
@@ -116,7 +117,7 @@ DROP TABLE IF EXISTS `reddit_clone`.`scores`;
 
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`scores` (
   `id_score` INT NOT NULL AUTO_INCREMENT,
-  `score` INT NOT NULL DEFAULT 0,
+  `score` BOOL NOT NULL,
   `id_post` INT,
   `id_comment` INT,
   `id_user` INT NOT NULL,
@@ -150,6 +151,7 @@ ENGINE = InnoDB;
 DROP USER IF EXISTS backend;
 
 CREATE USER 'backend';
+-- ALTER USER 'backend' IDENTIFIED BY 'password';
 
 GRANT CREATE, DROP ON reddit_clone.* TO 'backend';
 GRANT CREATE, DROP, INSERT, SELECT, UPDATE, DELETE ON TABLE `reddit_clone`.`subreddits` TO 'backend';
