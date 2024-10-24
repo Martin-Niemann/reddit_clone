@@ -19,13 +19,13 @@ posts.link,
 posts.created_at,
 posts.updated_at,
 users.user_name,
-(SELECT COUNT(*) FROM scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
-(SELECT COUNT(*) FROM scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
 AS score
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
-WHERE posts.id_subreddit = 1
+WHERE posts.id_subreddit = ?
 ORDER BY posts.created_at DESC;
 
 -- name: SubredditByIdListPostsSortScore :many
@@ -36,8 +36,8 @@ posts.link,
 posts.created_at,
 posts.updated_at,
 users.user_name,
-(SELECT COUNT(*) FROM scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
-(SELECT COUNT(*) FROM scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
 AS score
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
@@ -64,15 +64,15 @@ posts.text,
 posts.created_at,
 posts.updated_at,
 users.user_name,
-(SELECT COUNT(*) FROM scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
-(SELECT COUNT(*) FROM scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
 AS score
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
 WHERE posts.id_post = ?;
 
--- name: PostByIdListComments: many
+-- name: PostByIdListComments :many
 SELECT comments.id_comment, comments.parent_id, comments.id_user, comments.comment
 FROM reddit_clone.comments AS comments
 WHERE comments.id_post = ?;
@@ -98,7 +98,7 @@ INSERT INTO reddit_clone.comments (
     ?, ?, ?, ?
 );
 
--- name: VoteForPostOrComment: execresult
+-- name: VoteForPostOrComment :execresult
 INSERT INTO reddit_clone.scores (
     score, id_post, id_comment, id_user
 ) VALUES (
