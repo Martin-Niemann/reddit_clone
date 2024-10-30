@@ -16,8 +16,20 @@ func (c *Controller) setupRoutes(mux *http.ServeMux) *http.ServeMux {
 func (c *Controller) getSubreddit(writer http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	url := req.PathValue("url")
+	queries := req.URL.Query()
 
-	result, serviceError := c.service.getSubreddit(ctx, url)
+	var result *Subreddit
+	var serviceError ServiceError
+
+	switch {
+	case queries.Get("sort_by") == "date":
+		result, serviceError = c.service.getSubredditSortedByDate(ctx, url)
+	case queries.Get("sort_by") == "score":
+		result, serviceError = c.service.getSubredditSortedByScore(ctx, url)
+	default:
+		result, serviceError = c.service.getSubredditSortedByDate(ctx, url)
+	}
+
 	if serviceError.Type != NoError {
 		sendErrorResponse(writer, serviceError)
 	}

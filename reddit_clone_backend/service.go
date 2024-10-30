@@ -56,13 +56,50 @@ func NewService(mysql MysqlConnectionVariables) Service {
 	return Service{db: db, queries: queries}
 }
 
-func (s *Service) getSubreddit(ctx context.Context, url string) (*Subreddit, ServiceError) {
+func (s *Service) getSubredditSortedByDate(ctx context.Context, url string) (*Subreddit, ServiceError) {
 	subredditDetails, err := s.queries.SubredditByUrlDetails(ctx, url)
 	if err != nil {
 		return nil, getServiceErrorConst(err)
 	}
 
 	subredditPosts, err := s.queries.SubredditByIdListPostsSortDate(ctx, subredditDetails.IDSubreddit)
+	if err != nil {
+		return nil, getServiceErrorConst(err)
+	}
+
+	posts := []PostCard{}
+
+	for _, post := range subredditPosts {
+		posts = append(
+			posts,
+			PostCard{
+				Id:        post.IDPost,
+				Title:     post.Title,
+				Link:      post.Link,
+				CreatedAt: post.CreatedAt,
+				UpdatedAt: post.UpdatedAt,
+				UserName:  post.UserName,
+				Score:     post.Score})
+	}
+
+	data := Subreddit{
+		Id:          subredditDetails.IDSubreddit,
+		Name:        subredditDetails.Name,
+		Description: subredditDetails.Description,
+		Moderator:   subredditDetails.UserName,
+		Posts:       posts,
+	}
+
+	return &data, ServiceError{Type: NoError}
+}
+
+func (s *Service) getSubredditSortedByScore(ctx context.Context, url string) (*Subreddit, ServiceError) {
+	subredditDetails, err := s.queries.SubredditByUrlDetails(ctx, url)
+	if err != nil {
+		return nil, getServiceErrorConst(err)
+	}
+
+	subredditPosts, err := s.queries.SubredditByIdListPostsSortScore(ctx, subredditDetails.IDSubreddit)
 	if err != nil {
 		return nil, getServiceErrorConst(err)
 	}
