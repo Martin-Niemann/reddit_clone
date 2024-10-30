@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,34 +17,6 @@ type Controller struct {
 	handler http.Handler
 	server  http.Server
 	service Service
-}
-
-func (c *Controller) getSubreddit(writer http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	url := req.PathValue("url")
-
-	result, err := c.service.getSubreddit(ctx, url)
-	if err != nil {
-		writer.Write([]byte(err.Error()))
-	}
-
-	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(http.StatusOK)
-
-	err = json.NewEncoder(writer).Encode(*result)
-	if err != nil {
-		writer.Write([]byte(err.Error()))
-	}
-}
-
-func (c *Controller) setupRoutes(mux *http.ServeMux) *http.ServeMux {
-	mux.HandleFunc("GET /c/{name}", func(writer http.ResponseWriter, req *http.Request) {
-		println(req.PathValue("name"))
-	})
-
-	mux.HandleFunc("GET /r/{url}", c.getSubreddit)
-
-	return mux
 }
 
 func (c *Controller) Setup(mysql MysqlConnectionVariables) error {
@@ -68,4 +41,28 @@ func (c *Controller) Run() {
 func (c *Controller) Shutdown(timeoutCtx context.Context) {
 	c.service.closeConnection()
 	c.server.Shutdown(timeoutCtx)
+}
+
+func sendValidResponse[T any](result T, writer http.ResponseWriter) {
+	writer.Header().Set("Content-Type", "application/json")
+
+	err := json.NewEncoder(writer).Encode(result)
+	if err != nil {
+		log.Println(err.Error())
+
+		http.Error(writer, err.Error(), 500)
+	}
+}
+
+func sendErrorResponse(writer http.ResponseWriter, serviceError ServiceError) {
+	switch serviceError.Type {
+	case NoResult:
+		http.Error(writer, http.StatusText(400), 400)
+		return
+	case UnexpectedError:
+		http.Error(writer, http.StatusText(500), 500)
+		return
+	default:
+		panic(fmt.Sprintf("unexpected main.ServiceError: %+v", serviceError))
+	}
 }
