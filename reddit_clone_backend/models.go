@@ -39,6 +39,7 @@ type ServiceErrorType int
 
 const (
 	NoResult ServiceErrorType = iota
+	InvalidArgument
 	UnexpectedError
 	NoError
 )

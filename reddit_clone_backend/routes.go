@@ -41,7 +41,7 @@ func (c *Controller) getPost(writer http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	idInt64, err := strconv.ParseInt(req.PathValue("id"), 10, 32)
 	if err != nil {
-		writer.Write([]byte(err.Error()))
+		sendErrorResponse(writer, ServiceError{Type: InvalidArgument})
 	}
 
 	result, serviceError := c.service.getPost(ctx, int32(idInt64))

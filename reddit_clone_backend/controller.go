@@ -57,6 +57,9 @@ func sendValidResponse[T any](result T, writer http.ResponseWriter) {
 func sendErrorResponse(writer http.ResponseWriter, serviceError ServiceError) {
 	switch serviceError.Type {
 	case NoResult:
+		http.Error(writer, http.StatusText(204), 204)
+		return
+	case InvalidArgument:
 		http.Error(writer, http.StatusText(400), 400)
 		return
 	case UnexpectedError:
