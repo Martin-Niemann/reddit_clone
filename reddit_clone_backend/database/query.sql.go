@@ -11,6 +11,22 @@ import (
 	"time"
 )
 
+const checkForExistingUser = `-- name: CheckForExistingUser :one
+SELECT EXISTS(SELECT 1 FROM reddit_clone.users WHERE email = ? OR user_name = ?)
+`
+
+type CheckForExistingUserParams struct {
+	Email    string `json:"email"`
+	UserName string `json:"user_name"`
+}
+
+func (q *Queries) CheckForExistingUser(ctx context.Context, arg CheckForExistingUserParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkForExistingUser, arg.Email, arg.UserName)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createComment = `-- name: CreateComment :execresult
 
 INSERT INTO reddit_clone.comments (
@@ -88,6 +104,27 @@ func (q *Queries) CreateSubreddit(ctx context.Context, arg CreateSubredditParams
 	)
 }
 
+const createUser = `-- name: CreateUser :execresult
+
+INSERT INTO reddit_clone.users (
+    user_name, email, hashed_password
+) VALUES (
+    ?, ?, ?
+)
+`
+
+type CreateUserParams struct {
+	UserName       string `json:"user_name"`
+	Email          string `json:"email"`
+	HashedPassword string `json:"hashed_password"`
+}
+
+// -------------------------------------------------- --
+// Users
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createUser, arg.UserName, arg.Email, arg.HashedPassword)
+}
+
 const deletePost = `-- name: DeletePost :execresult
 DELETE FROM reddit_clone.posts
 WHERE id_post = ?
@@ -95,6 +132,32 @@ WHERE id_post = ?
 
 func (q *Queries) DeletePost(ctx context.Context, idPost int32) (sql.Result, error) {
 	return q.db.ExecContext(ctx, deletePost, idPost)
+}
+
+const deleteUser = `-- name: DeleteUser :execresult
+DELETE FROM reddit_clone.users
+WHERE id_user = ?
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, idUser int32) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteUser, idUser)
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id_user, user_name, email, hashed_password FROM reddit_clone.users
+WHERE email = ? LIMIT 1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (RedditCloneUser, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i RedditCloneUser
+	err := row.Scan(
+		&i.IDUser,
+		&i.UserName,
+		&i.Email,
+		&i.HashedPassword,
+	)
+	return i, err
 }
 
 const postByIdDetails = `-- name: PostByIdDetails :one
@@ -128,7 +191,7 @@ type PostByIdDetailsRow struct {
 }
 
 // -------------------------------------------------- --
-// Post
+// Posts
 func (q *Queries) PostByIdDetails(ctx context.Context, idPost int32) (PostByIdDetailsRow, error) {
 	row := q.db.QueryRowContext(ctx, postByIdDetails, idPost)
 	var i PostByIdDetailsRow
@@ -324,7 +387,7 @@ type SubredditByUrlDetailsRow struct {
 // Client:
 // vis i realtid hvordan det lowercasede subreddit url kommer til at se ud imens du skriver display navnet
 // -------------------------------------------------- --
-// Subreddit
+// Subreddits
 func (q *Queries) SubredditByUrlDetails(ctx context.Context, url string) (SubredditByUrlDetailsRow, error) {
 	row := q.db.QueryRowContext(ctx, subredditByUrlDetails, url)
 	var i SubredditByUrlDetailsRow

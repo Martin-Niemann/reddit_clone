@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS `reddit_clone`.`users` (
   `id_user` INT NOT NULL AUTO_INCREMENT,
   `user_name` VARCHAR(100) NOT NULL,
   `email` VARCHAR(320) NOT NULL,
-  `hashed_password` VARCHAR(256) NOT NULL,
+  `hashed_password` VARCHAR(60) NOT NULL,
   PRIMARY KEY (`id_user`),
   UNIQUE INDEX `id_user_UNIQUE` (`id_user` ASC) VISIBLE,
   UNIQUE INDEX `user_name_UNIQUE` (`user_name` ASC) VISIBLE,

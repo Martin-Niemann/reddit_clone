@@ -39,12 +39,44 @@ type ServiceErrorType int
 
 const (
 	NoResult ServiceErrorType = iota
+	InvalidInput
 	InvalidArgument
 	UnexpectedError
+	UserAlreadyExists
+	UserDoesntExist
+	InvalidEmailAndOrPassword
+	MissingAuthCookie
+	InvalidOrExpiredToken
 	NoError
 )
 
 type ServiceError struct {
-	Type ServiceErrorType
-	Text string
+	Type             ServiceErrorType
+	Text             string
+	ValidationErrors []ValidationError
+}
+
+type LoginDetails struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=14,max=72"`
+}
+
+type Token struct {
+	Token string `json:"token" validate:"jwt"`
+}
+
+type SignUpDetails struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=14,max=72"`
+	UserName string `json:"username" validate:"required,min=1,max=100"`
+}
+
+type UserId struct {
+	Id int32 `json:"id"`
+}
+
+type ValidationError struct {
+	Field string `json:"field"`
+	Tag   string `json:"tag"`
+	Value string `json:"value"`
 }

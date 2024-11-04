@@ -1,0 +1,190 @@
+{
+  "name": "reddit_client api",
+  "version": "1",
+  "items": [
+    {
+      "type": "http",
+      "name": "SignUp",
+      "seq": 2,
+      "request": {
+        "url": "127.0.0.1:8090/signup",
+        "method": "POST",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "json",
+          "json": "{\n  \"email\": \"laureen4236@gmail.com\",\n  \"username\": \"laureen_the_nerd\",\n  \"password\": \"godIhatepasswords1\"\n}",
+          "formUrlEncoded": [],
+          "multipartForm": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 201",
+            "enabled": true,
+            "uid": "O4SBiKSCCxuSbv91JBaLq"
+          }
+        ],
+        "tests": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "TryLoginLaureen",
+      "seq": 3,
+      "request": {
+        "url": "127.0.0.1:8090/login",
+        "method": "POST",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "json",
+          "json": "{\n  \"email\": \"laureen4236@gmail.com\",\n  \"password\": \"godIhatepasswords1\"\n}",
+          "formUrlEncoded": [],
+          "multipartForm": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true,
+            "uid": "1YV2ggh2M6l9x4W4GEzNT"
+          },
+          {
+            "name": "res.getHeader(\"set-cookie\")",
+            "value": "isDefined",
+            "enabled": true,
+            "uid": "WAzLWe8cQDUFtkyj4THGA"
+          }
+        ],
+        "tests": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "TryLoginLaureenFail",
+      "seq": 1,
+      "request": {
+        "url": "127.0.0.1:8090/login",
+        "method": "POST",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "json",
+          "json": "{\n  \"email\": \"laureen4236@gmail.com\",\n  \"password\": \"godIhatepasswords1\"\n}",
+          "formUrlEncoded": [],
+          "multipartForm": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 401",
+            "enabled": true,
+            "uid": "bK1XdPt6il6Bie2zdsPq8"
+          }
+        ],
+        "tests": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "DeleteAccount",
+      "seq": 5,
+      "request": {
+        "url": "127.0.0.1:8090/deleteaccount",
+        "method": "DELETE",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true,
+            "uid": "DxQTaMEO9Xn7S4snQBhUs"
+          }
+        ],
+        "tests": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "type": "http",
+      "name": "DeleteAccountFail",
+      "seq": 6,
+      "request": {
+        "url": "127.0.0.1:8090/deleteaccount",
+        "method": "DELETE",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none",
+          "formUrlEncoded": [],
+          "multipartForm": []
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true,
+            "uid": "QHuT4EtDIzD0iQ6HfZEYb"
+          }
+        ],
+        "tests": "",
+        "auth": {
+          "mode": "none"
+        }
+      }
+    }
+  ],
+  "environments": [],
+  "root": {
+    "request": {
+      "auth": {
+        "mode": "none"
+      },
+      "script": {
+        "req": "// https://github.com/usebruno/bruno/issues/334#issuecomment-1915096021\nif (bru.getVar(\"TOKEN\")) {\n  req.setHeader(\"Cookie\", bru.getVar(\"TOKEN\"));  \n}",
+        "res": "const cookie = res.getHeader(\"set-cookie\");\n  if (cookie) {\n      console.log(\"manualing saving the cookie\");\n      bru.setVar(\"TOKEN\", cookie);  \n  }"
+      }
+    }
+  },
+  "brunoConfig": {
+    "version": "1",
+    "name": "reddit_client api",
+    "type": "collection",
+    "ignore": [
+      "node_modules",
+      ".git"
+    ],
+    "presets": {
+      "requestType": "http",
+      "requestUrl": "127.0.0.1:8090"
+    }
+  }
+}

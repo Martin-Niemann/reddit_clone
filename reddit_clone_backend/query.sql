@@ -2,7 +2,7 @@
 -- vis i realtid hvordan det lowercasede subreddit url kommer til at se ud imens du skriver display navnet
 
 -- -------------------------------------------------- --
--- Subreddit
+-- Subreddits
 
 -- name: SubredditByUrlDetails :one
 SELECT subreddits.id_subreddit, subreddits.name, subreddits.description, users.user_name
@@ -53,7 +53,7 @@ INSERT INTO reddit_clone.subreddits (
 );
                                                       --
 -- -------------------------------------------------- --
--- Post
+-- Posts
 
 -- name: PostByIdDetails :one
 SELECT
@@ -104,3 +104,24 @@ INSERT INTO reddit_clone.scores (
 ) VALUES (
     ?, ?, ?, ?
 );
+                                                      --
+-- -------------------------------------------------- --
+-- Users
+
+-- name: CreateUser :execresult
+INSERT INTO reddit_clone.users (
+    user_name, email, hashed_password
+) VALUES (
+    ?, ?, ?
+);
+
+-- name: CheckForExistingUser :one
+SELECT EXISTS(SELECT 1 FROM reddit_clone.users WHERE email = ? OR user_name = ?);
+
+-- name: GetUserByEmail :one
+SELECT * FROM reddit_clone.users
+WHERE email = ? LIMIT 1;
+
+-- name: DeleteUser :execresult
+DELETE FROM reddit_clone.users
+WHERE id_user = ?;
