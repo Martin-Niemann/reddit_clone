@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `reddit_clone`.`subreddits` (
   UNIQUE INDEX `name_UNIQUE` (`name` ASC) VISIBLE,
   UNIQUE INDEX `url_UNIQUE` (`url` ASC) VISIBLE,
   INDEX `users_idx` (`id_user` ASC) VISIBLE,
+  FULLTEXT `subreddits_fulltext` (`url`,`name`,`description`),
   CONSTRAINT `subreddits_owner`
     FOREIGN KEY (`id_user`)
     REFERENCES `reddit_clone`.`users` (`id_user`)
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS `reddit_clone`.`posts` (
   PRIMARY KEY (`id_post`),
   UNIQUE INDEX `id_post_UNIQUE` (`id_post` ASC) VISIBLE,
   INDEX `users_idx` (`id_user` ASC) VISIBLE,
+  FULLTEXT `posts_fulltext` (`title`,`link`,`text`),
   CONSTRAINT `posts_subreddits`
     FOREIGN KEY (`id_subreddit`)
     REFERENCES `reddit_clone`.`subreddits` (`id_subreddit`)
@@ -150,7 +152,7 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 DROP USER IF EXISTS backend;
 
-CREATE USER 'backend';
+CREATE USER 'backend@127.0.0.1';
 -- ALTER USER 'backend' IDENTIFIED BY 'password';
 
 GRANT CREATE, DROP ON reddit_clone.* TO 'backend';

@@ -11,7 +11,7 @@ JOIN (reddit_clone.users AS users)
 ON (users.id_user = subreddits.id_user)
 WHERE subreddits.url = ?;
 
--- name: SubredditByIdListPostsSortDate :many
+-- name: SubredditByIdListPostsSortNewestStart :many
 SELECT
 posts.id_post,
 posts.title,
@@ -26,9 +26,28 @@ FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
 WHERE posts.id_subreddit = ?
-ORDER BY posts.created_at DESC;
+ORDER BY posts.id_post DESC
+LIMIT 30;
 
--- name: SubredditByIdListPostsSortScore :many
+-- name: SubredditByIdListPostsSortNewestKeySetPaginated :many
+SELECT
+posts.id_post,
+posts.title,
+posts.link,
+posts.created_at,
+posts.updated_at,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
+AS score
+FROM reddit_clone.posts AS posts
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = posts.id_user)
+WHERE posts.id_subreddit = ? AND posts.id_post < ? 
+ORDER BY posts.id_post DESC
+LIMIT 30;
+
+-- name: SubredditByIdListPostsSortScoreHighest :many
 SELECT
 posts.id_post,
 posts.title,
@@ -43,7 +62,8 @@ FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
 WHERE posts.id_subreddit = ?
-ORDER BY score DESC;
+ORDER BY score DESC
+LIMIT 30 OFFSET ?;
 
 -- name: CreateSubreddit :execresult
 INSERT INTO reddit_clone.subreddits (

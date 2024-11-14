@@ -143,6 +143,7 @@ func (c *Controller) authenticationAndAuthorizationMiddleware(next http.Handler)
 			return
 		}
 
+		// https://fideloper.com/golang-context-http-middleware
 		var ctx context.Context
 		if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok {
 			fmt.Println("the id and iat are: ", claims["id"], claims["iat"])

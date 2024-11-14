@@ -30,13 +30,29 @@ func (c *Controller) getSubreddit(writer http.ResponseWriter, req *http.Request)
 	var result *Subreddit
 	var serviceError ServiceError
 
+	println("these are the query values: ", queries.Get("sort_by"), queries.Get("id"))
+
+	// https://stackoverflow.com/a/77865848
+	// "The first case that matches the switch statement is executed"
 	switch {
-	case queries.Get("sort_by") == "date":
-		result, serviceError = c.service.getSubredditSortedByDate(ctx, url)
-	case queries.Get("sort_by") == "score":
-		result, serviceError = c.service.getSubredditSortedByScore(ctx, url)
+	case queries.Get("sort_by") == "newest" && queries.Get("id") != "":
+		postId, err := strconv.Atoi(queries.Get("id"))
+		if err != nil {
+			sendErrorResponse(writer, ServiceError{Type: InvalidArgument})
+			return
+		}
+		result, serviceError = c.service.getSubredditSortedByNewestKeysetPaginated(ctx, url, int32(postId))
+	case queries.Get("sort_by") == "newest":
+		result, serviceError = c.service.getSubredditSortedByNewestStart(ctx, url)
+	case queries.Get("sort_by") == "score" && queries.Get("direction") == "falling" && queries.Get("offset") != "":
+		offset, err := strconv.Atoi(queries.Get("offset"))
+		if err != nil {
+			sendErrorResponse(writer, ServiceError{Type: InvalidArgument})
+			return
+		}
+		result, serviceError = c.service.getSubredditSortedByScoreHighestOffsetPaginated(ctx, url, int32(offset))
 	default:
-		result, serviceError = c.service.getSubredditSortedByDate(ctx, url)
+		println("you wrote something wrong dummy!")
 	}
 
 	if serviceError.Type != NoError {
