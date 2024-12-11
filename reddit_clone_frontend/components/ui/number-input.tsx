@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { NumberInput as ChakraNumberInput } from "@chakra-ui/react"
 import { forwardRef } from "react"
 

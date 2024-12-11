@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client"
 
 import type { HTMLChakraProps, RecipeProps } from "@chakra-ui/react"
