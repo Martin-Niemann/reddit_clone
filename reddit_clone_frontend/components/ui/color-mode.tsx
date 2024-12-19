@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client"
 
 import type { IconButtonProps } from "@chakra-ui/react"

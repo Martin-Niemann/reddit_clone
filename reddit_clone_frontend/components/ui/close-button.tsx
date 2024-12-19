@@ -1,3 +1,4 @@
+/* eslint-disable */
 import type { ButtonProps as ChakraCloseButtonProps } from "@chakra-ui/react"
 import { IconButton as ChakraIconButton } from "@chakra-ui/react"
 import { forwardRef } from "react"

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Accordion, HStack } from "@chakra-ui/react"
 import { forwardRef } from "react"
 import { LuChevronDown } from "react-icons/lu"
