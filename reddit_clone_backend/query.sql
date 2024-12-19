@@ -21,7 +21,9 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+(SELECT COUNT(*) FROM reddit_clone.comments WHERE comments.id_post = posts.id_post)
+as comments_count
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
@@ -39,7 +41,9 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+(SELECT COUNT(*) FROM reddit_clone.comments WHERE comments.id_post = posts.id_post)
+as comments_count
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
@@ -57,7 +61,9 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+(SELECT COUNT(*) FROM reddit_clone.comments WHERE comments.id_post = posts.id_post)
+as comments_count
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
@@ -86,15 +92,27 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+subreddits.name
 FROM reddit_clone.posts AS posts
-JOIN (reddit_clone.users AS users)
-ON (users.id_user = posts.id_user)
+JOIN (reddit_clone.users AS users, reddit_clone.subreddits AS subreddits)
+ON (users.id_user = posts.id_user AND subreddits.id_subreddit = posts.id_subreddit)
 WHERE posts.id_post = ?;
 
 -- name: PostByIdListComments :many
-SELECT comments.id_comment, comments.parent_id, comments.id_user, comments.comment
+SELECT 
+comments.id_comment,
+comments.parent_id,
+comments.created_at,
+comments.updated_at,
+comments.comment,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_comment = comments.id_comment) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_comment = comments.id_comment)
+AS score
 FROM reddit_clone.comments AS comments
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = comments.id_user)
 WHERE comments.id_post = ?;
 
 -- name: CreatePost :execresult
@@ -107,23 +125,59 @@ INSERT INTO reddit_clone.posts (
 -- name: DeletePost :execresult
 DELETE FROM reddit_clone.posts
 WHERE id_post = ?;
+
+-- name: PostsFullTextSearch :many
+SELECT
+posts.id_post,
+posts.title,
+posts.link,
+posts.text,
+posts.created_at,
+posts.updated_at,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
+AS score
+FROM reddit_clone.posts AS posts
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = posts.id_user)
+WHERE MATCH (posts.title, posts.text)
+AGAINST (? IN NATURAL LANGUAGE MODE);
+
                                                       --
 -- -------------------------------------------------- --
--- Post and Comment
+-- Comment
 
--- name: CreateComment :execresult
+-- name: GetCommentById :one
+SELECT 
+comments.id_comment,
+comments.parent_id,
+comments.created_at,
+comments.updated_at,
+comments.comment,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_comment = comments.id_comment) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_comment = comments.id_comment)
+AS score
+FROM reddit_clone.comments AS comments
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = comments.id_user)
+WHERE comments.id_comment = ?;
+
+-- name: CreateCommentOnPost :execresult
 INSERT INTO reddit_clone.comments (
-    comment, id_post, parent_id, id_user
+    comment, id_post, id_user, is_toplevel
 ) VALUES (
-    ?, ?, ?, ?
+    ?, ?, ?, true
 );
 
--- name: VoteForPostOrComment :execresult
-INSERT INTO reddit_clone.scores (
-    score, id_post, id_comment, id_user
+-- name: CreateCommentOnParent :execresult
+INSERT INTO reddit_clone.comments (
+    comment, id_post, parent_id, id_user, is_toplevel
 ) VALUES (
-    ?, ?, ?, ?
+    ?, ?, ?, ?, false
 );
+
                                                       --
 -- -------------------------------------------------- --
 -- Users
@@ -145,3 +199,21 @@ WHERE email = ? LIMIT 1;
 -- name: DeleteUser :execresult
 DELETE FROM reddit_clone.users
 WHERE id_user = ?;
+
+                                                      --
+-- -------------------------------------------------- --
+-- Scores
+
+-- name: VoteOnPost :execresult
+INSERT INTO reddit_clone.scores (
+    score, id_post, id_user
+) VALUES (
+    ?, ?, ?
+);
+
+-- name: VoteOnComment :execresult
+INSERT INTO reddit_clone.scores (
+    score, id_comment, id_user
+) VALUES (
+    ?, ?, ?
+);

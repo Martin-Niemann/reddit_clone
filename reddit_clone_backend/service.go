@@ -73,13 +73,14 @@ func (s *Service) getSubredditSortedByNewestStart(ctx context.Context, url strin
 		posts = append(
 			posts,
 			PostCard{
-				Id:        post.IDPost,
-				Title:     post.Title,
-				Link:      post.Link,
-				CreatedAt: post.CreatedAt,
-				UpdatedAt: post.UpdatedAt,
-				UserName:  post.UserName,
-				Score:     post.Score})
+				Id:            post.IDPost,
+				Title:         post.Title,
+				Link:          post.Link,
+				CreatedAt:     post.CreatedAt,
+				UpdatedAt:     post.UpdatedAt,
+				UserName:      post.UserName,
+				Score:         post.Score,
+				CommentsCount: post.CommentsCount})
 	}
 
 	data := Subreddit{
@@ -110,13 +111,14 @@ func (s *Service) getSubredditSortedByNewestKeysetPaginated(ctx context.Context,
 		posts = append(
 			posts,
 			PostCard{
-				Id:        post.IDPost,
-				Title:     post.Title,
-				Link:      post.Link,
-				CreatedAt: post.CreatedAt,
-				UpdatedAt: post.UpdatedAt,
-				UserName:  post.UserName,
-				Score:     post.Score})
+				Id:            post.IDPost,
+				Title:         post.Title,
+				Link:          post.Link,
+				CreatedAt:     post.CreatedAt,
+				UpdatedAt:     post.UpdatedAt,
+				UserName:      post.UserName,
+				Score:         post.Score,
+				CommentsCount: post.CommentsCount})
 	}
 
 	data := Subreddit{
@@ -147,13 +149,14 @@ func (s *Service) getSubredditSortedByScoreHighestOffsetPaginated(ctx context.Co
 		posts = append(
 			posts,
 			PostCard{
-				Id:        post.IDPost,
-				Title:     post.Title,
-				Link:      post.Link,
-				CreatedAt: post.CreatedAt,
-				UpdatedAt: post.UpdatedAt,
-				UserName:  post.UserName,
-				Score:     post.Score})
+				Id:            post.IDPost,
+				Title:         post.Title,
+				Link:          post.Link,
+				CreatedAt:     post.CreatedAt,
+				UpdatedAt:     post.UpdatedAt,
+				UserName:      post.UserName,
+				Score:         post.Score,
+				CommentsCount: post.CommentsCount})
 	}
 
 	data := Subreddit{
@@ -184,10 +187,13 @@ func (s *Service) getPost(ctx context.Context, id int32) (*PostFull, ServiceErro
 		comments = append(
 			comments,
 			Comment{
-				Id:       comment.IDComment,
-				ParentId: comment.ParentID,
-				UserId:   comment.IDUser,
-				Comment:  comment.Comment,
+				Id:        comment.IDComment,
+				ParentId:  comment.ParentID,
+				CreatedAt: comment.CreatedAt,
+				UpdatedAt: comment.UpdatedAt,
+				UserName:  comment.UserName,
+				Text:      comment.Comment,
+				Score:     comment.Score,
 			})
 	}
 
@@ -201,9 +207,108 @@ func (s *Service) getPost(ctx context.Context, id int32) (*PostFull, ServiceErro
 			UserName:  postDetails.UserName,
 			Score:     postDetails.Score,
 		},
-		Text:     postDetails.Text,
-		Comments: comments,
+		CommunityName: postDetails.Name,
+		Text:          postDetails.Text,
+		Comments:      comments,
 	}
 
 	return &data, ServiceError{Type: NoError}
+}
+
+func (s *Service) getComment(ctx context.Context, id int32) (*Comment, ServiceError) {
+	dbComment, err := s.queries.GetCommentById(ctx, id)
+	if err != nil {
+		return nil, getServiceErrorConst(err)
+	}
+
+	comment := Comment{
+		Id:        dbComment.IDComment,
+		ParentId:  dbComment.ParentID,
+		CreatedAt: dbComment.CreatedAt,
+		UpdatedAt: dbComment.UpdatedAt,
+		UserName:  dbComment.UserName,
+		Text:      dbComment.Comment,
+		Score:     dbComment.Score,
+	}
+
+	return &comment, ServiceError{Type: NoError}
+}
+
+func (s *Service) addComment(ctx context.Context, commentDetails *CommentDetails) (int64, ServiceError) {
+	var result sql.Result
+	var err error
+
+	if commentDetails.ParentId != 0 {
+		result, err = s.queries.CreateCommentOnParent(ctx, database.CreateCommentOnParentParams{Comment: commentDetails.Text, IDPost: commentDetails.PostId, ParentID: &commentDetails.ParentId, IDUser: commentDetails.UserId})
+		if err != nil {
+			return 0, getServiceErrorConst(err)
+		}
+	} else {
+		result, err = s.queries.CreateCommentOnPost(ctx, database.CreateCommentOnPostParams{Comment: commentDetails.Text, IDPost: commentDetails.PostId, IDUser: commentDetails.UserId})
+		if err != nil {
+			return 0, getServiceErrorConst(err)
+		}
+	}
+
+	insertId, err := result.LastInsertId()
+	if err != nil {
+		return 0, getServiceErrorConst(err)
+	}
+
+	return insertId, ServiceError{Type: NoError}
+}
+
+func (s *Service) voteOnComment(ctx context.Context, scoreDetails *ScoreDetails) (int64, ServiceError) {
+	var result sql.Result
+	var err error
+
+	switch scoreDetails.Score {
+	case -1:
+		result, err = s.queries.VoteOnComment(ctx, database.VoteOnCommentParams{Score: false, IDComment: &scoreDetails.CommentId, IDUser: scoreDetails.UserId})
+		if err != nil {
+			return 0, getServiceErrorConst(err)
+		}
+	case 1:
+	}
+
+	insertId, err := result.LastInsertId()
+	if err != nil {
+		return 0, getServiceErrorConst(err)
+	}
+
+	return insertId, ServiceError{Type: NoError}
+}
+
+func (s *Service) addCommunity(ctx context.Context, subredditDetails *SubredditDetails) (int64, ServiceError) {
+	var result sql.Result
+	var err error
+
+	result, err = s.queries.CreateSubreddit(ctx, database.CreateSubredditParams{Url: subredditDetails.Url, Name: subredditDetails.DisplayName, Description: &subredditDetails.Description, IDUser: &subredditDetails.UserId})
+	if err != nil {
+		return 0, getServiceErrorConst(err)
+	}
+
+	insertId, err := result.LastInsertId()
+	if err != nil {
+		return 0, getServiceErrorConst(err)
+	}
+
+	return insertId, ServiceError{Type: NoError}
+}
+
+func (s *Service) addPost(ctx context.Context, postDetails *PostDetails) (int64, ServiceError) {
+	var result sql.Result
+	var err error
+
+	result, err = s.queries.CreatePost(ctx, database.CreatePostParams{Title: postDetails.Title, Link: postDetails.Link, Text: postDetails.Text, IDSubreddit: postDetails.CommunityId, IDUser: postDetails.UserId})
+	if err != nil {
+		return 0, getServiceErrorConst(err)
+	}
+
+	insertId, err := result.LastInsertId()
+	if err != nil {
+		return 0, getServiceErrorConst(err)
+	}
+
+	return insertId, ServiceError{Type: NoError}
 }

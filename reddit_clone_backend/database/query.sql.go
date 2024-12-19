@@ -27,31 +27,46 @@ func (q *Queries) CheckForExistingUser(ctx context.Context, arg CheckForExisting
 	return exists, err
 }
 
-const createComment = `-- name: CreateComment :execresult
-
+const createCommentOnParent = `-- name: CreateCommentOnParent :execresult
 INSERT INTO reddit_clone.comments (
-    comment, id_post, parent_id, id_user
+    comment, id_post, parent_id, id_user, is_toplevel
 ) VALUES (
-    ?, ?, ?, ?
+    ?, ?, ?, ?, false
 )
 `
 
-type CreateCommentParams struct {
-	Comment  string        `json:"comment"`
-	IDPost   int32         `json:"id_post"`
+type CreateCommentOnParentParams struct {
+	Comment  string `json:"comment"`
+	IDPost   int32  `json:"id_post"`
 	ParentID *int32 `json:"parent_id"`
-	IDUser   int32         `json:"id_user"`
+	IDUser   int32  `json:"id_user"`
 }
 
-// -------------------------------------------------- --
-// Post and Comment
-func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createComment,
+func (q *Queries) CreateCommentOnParent(ctx context.Context, arg CreateCommentOnParentParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createCommentOnParent,
 		arg.Comment,
 		arg.IDPost,
 		arg.ParentID,
 		arg.IDUser,
 	)
+}
+
+const createCommentOnPost = `-- name: CreateCommentOnPost :execresult
+INSERT INTO reddit_clone.comments (
+    comment, id_post, id_user, is_toplevel
+) VALUES (
+    ?, ?, ?, true
+)
+`
+
+type CreateCommentOnPostParams struct {
+	Comment string `json:"comment"`
+	IDPost  int32  `json:"id_post"`
+	IDUser  int32  `json:"id_user"`
+}
+
+func (q *Queries) CreateCommentOnPost(ctx context.Context, arg CreateCommentOnPostParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createCommentOnPost, arg.Comment, arg.IDPost, arg.IDUser)
 }
 
 const createPost = `-- name: CreatePost :execresult
@@ -63,11 +78,11 @@ INSERT INTO reddit_clone.posts (
 `
 
 type CreatePostParams struct {
-	Title       string         `json:"title"`
+	Title       string  `json:"title"`
 	Link        *string `json:"link"`
 	Text        *string `json:"text"`
-	IDSubreddit int32          `json:"id_subreddit"`
-	IDUser      int32          `json:"id_user"`
+	IDSubreddit int32   `json:"id_subreddit"`
+	IDUser      int32   `json:"id_user"`
 }
 
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (sql.Result, error) {
@@ -89,8 +104,8 @@ INSERT INTO reddit_clone.subreddits (
 `
 
 type CreateSubredditParams struct {
-	Url         string         `json:"url"`
-	Name        string         `json:"name"`
+	Url         string  `json:"url"`
+	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	IDUser      *int32  `json:"id_user"`
 }
@@ -143,6 +158,51 @@ func (q *Queries) DeleteUser(ctx context.Context, idUser int32) (sql.Result, err
 	return q.db.ExecContext(ctx, deleteUser, idUser)
 }
 
+const getCommentById = `-- name: GetCommentById :one
+
+SELECT 
+comments.id_comment,
+comments.parent_id,
+comments.created_at,
+comments.updated_at,
+comments.comment,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_comment = comments.id_comment) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_comment = comments.id_comment)
+AS score
+FROM reddit_clone.comments AS comments
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = comments.id_user)
+WHERE comments.id_comment = ?
+`
+
+type GetCommentByIdRow struct {
+	IDComment int32      `json:"id_comment"`
+	ParentID  *int32     `json:"parent_id"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
+	Comment   string     `json:"comment"`
+	UserName  string     `json:"user_name"`
+	Score     int32      `json:"score"`
+}
+
+// -------------------------------------------------- --
+// Comment
+func (q *Queries) GetCommentById(ctx context.Context, idComment int32) (GetCommentByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getCommentById, idComment)
+	var i GetCommentByIdRow
+	err := row.Scan(
+		&i.IDComment,
+		&i.ParentID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Comment,
+		&i.UserName,
+		&i.Score,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id_user, user_name, email, hashed_password FROM reddit_clone.users
 WHERE email = ? LIMIT 1
@@ -172,22 +232,24 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+subreddits.name
 FROM reddit_clone.posts AS posts
-JOIN (reddit_clone.users AS users)
-ON (users.id_user = posts.id_user)
+JOIN (reddit_clone.users AS users, reddit_clone.subreddits AS subreddits)
+ON (users.id_user = posts.id_user AND subreddits.id_subreddit = posts.id_subreddit)
 WHERE posts.id_post = ?
 `
 
 type PostByIdDetailsRow struct {
-	IDPost    int32          `json:"id_post"`
-	Title     string         `json:"title"`
-	Link      *string `json:"link"`
-	Text      *string `json:"text"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt *time.Time   `json:"updated_at"`
-	UserName  string         `json:"user_name"`
-	Score     int32          `json:"score"`
+	IDPost    int32      `json:"id_post"`
+	Title     string     `json:"title"`
+	Link      *string    `json:"link"`
+	Text      *string    `json:"text"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
+	UserName  string     `json:"user_name"`
+	Score     int32      `json:"score"`
+	Name      string     `json:"name"`
 }
 
 // -------------------------------------------------- --
@@ -204,21 +266,36 @@ func (q *Queries) PostByIdDetails(ctx context.Context, idPost int32) (PostByIdDe
 		&i.UpdatedAt,
 		&i.UserName,
 		&i.Score,
+		&i.Name,
 	)
 	return i, err
 }
 
 const postByIdListComments = `-- name: PostByIdListComments :many
-SELECT comments.id_comment, comments.parent_id, comments.id_user, comments.comment
+SELECT 
+comments.id_comment,
+comments.parent_id,
+comments.created_at,
+comments.updated_at,
+comments.comment,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_comment = comments.id_comment) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_comment = comments.id_comment)
+AS score
 FROM reddit_clone.comments AS comments
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = comments.id_user)
 WHERE comments.id_post = ?
 `
 
 type PostByIdListCommentsRow struct {
-	IDComment int32         `json:"id_comment"`
-	ParentID  *int32 `json:"parent_id"`
-	IDUser    int32         `json:"id_user"`
-	Comment   string        `json:"comment"`
+	IDComment int32      `json:"id_comment"`
+	ParentID  *int32     `json:"parent_id"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
+	Comment   string     `json:"comment"`
+	UserName  string     `json:"user_name"`
+	Score     int32      `json:"score"`
 }
 
 func (q *Queries) PostByIdListComments(ctx context.Context, idPost int32) ([]PostByIdListCommentsRow, error) {
@@ -233,8 +310,73 @@ func (q *Queries) PostByIdListComments(ctx context.Context, idPost int32) ([]Pos
 		if err := rows.Scan(
 			&i.IDComment,
 			&i.ParentID,
-			&i.IDUser,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.Comment,
+			&i.UserName,
+			&i.Score,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const postsFullTextSearch = `-- name: PostsFullTextSearch :many
+SELECT
+posts.id_post,
+posts.title,
+posts.link,
+posts.text,
+posts.created_at,
+posts.updated_at,
+users.user_name,
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
+(SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
+AS score
+FROM reddit_clone.posts AS posts
+JOIN (reddit_clone.users AS users)
+ON (users.id_user = posts.id_user)
+WHERE MATCH (posts.title, posts.text)
+AGAINST (? IN NATURAL LANGUAGE MODE)
+`
+
+type PostsFullTextSearchRow struct {
+	IDPost    int32      `json:"id_post"`
+	Title     string     `json:"title"`
+	Link      *string    `json:"link"`
+	Text      *string    `json:"text"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
+	UserName  string     `json:"user_name"`
+	Score     int32      `json:"score"`
+}
+
+func (q *Queries) PostsFullTextSearch(ctx context.Context) ([]PostsFullTextSearchRow, error) {
+	rows, err := q.db.QueryContext(ctx, postsFullTextSearch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PostsFullTextSearchRow
+	for rows.Next() {
+		var i PostsFullTextSearchRow
+		if err := rows.Scan(
+			&i.IDPost,
+			&i.Title,
+			&i.Link,
+			&i.Text,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserName,
+			&i.Score,
 		); err != nil {
 			return nil, err
 		}
@@ -259,7 +401,9 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+(SELECT COUNT(*) FROM reddit_clone.comments WHERE comments.id_post = posts.id_post)
+as comments_count
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
@@ -274,13 +418,14 @@ type SubredditByIdListPostsSortNewestKeySetPaginatedParams struct {
 }
 
 type SubredditByIdListPostsSortNewestKeySetPaginatedRow struct {
-	IDPost    int32          `json:"id_post"`
-	Title     string         `json:"title"`
-	Link      *string `json:"link"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt *time.Time   `json:"updated_at"`
-	UserName  string         `json:"user_name"`
-	Score     int32          `json:"score"`
+	IDPost        int32      `json:"id_post"`
+	Title         string     `json:"title"`
+	Link          *string    `json:"link"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     *time.Time `json:"updated_at"`
+	UserName      string     `json:"user_name"`
+	Score         int32      `json:"score"`
+	CommentsCount int64      `json:"comments_count"`
 }
 
 func (q *Queries) SubredditByIdListPostsSortNewestKeySetPaginated(ctx context.Context, arg SubredditByIdListPostsSortNewestKeySetPaginatedParams) ([]SubredditByIdListPostsSortNewestKeySetPaginatedRow, error) {
@@ -300,6 +445,7 @@ func (q *Queries) SubredditByIdListPostsSortNewestKeySetPaginated(ctx context.Co
 			&i.UpdatedAt,
 			&i.UserName,
 			&i.Score,
+			&i.CommentsCount,
 		); err != nil {
 			return nil, err
 		}
@@ -324,7 +470,9 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+(SELECT COUNT(*) FROM reddit_clone.comments WHERE comments.id_post = posts.id_post)
+as comments_count
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
@@ -334,13 +482,14 @@ LIMIT 30
 `
 
 type SubredditByIdListPostsSortNewestStartRow struct {
-	IDPost    int32          `json:"id_post"`
-	Title     string         `json:"title"`
-	Link      *string `json:"link"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt *time.Time   `json:"updated_at"`
-	UserName  string         `json:"user_name"`
-	Score     int32          `json:"score"`
+	IDPost        int32      `json:"id_post"`
+	Title         string     `json:"title"`
+	Link          *string    `json:"link"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     *time.Time `json:"updated_at"`
+	UserName      string     `json:"user_name"`
+	Score         int32      `json:"score"`
+	CommentsCount int64      `json:"comments_count"`
 }
 
 func (q *Queries) SubredditByIdListPostsSortNewestStart(ctx context.Context, idSubreddit int32) ([]SubredditByIdListPostsSortNewestStartRow, error) {
@@ -360,6 +509,7 @@ func (q *Queries) SubredditByIdListPostsSortNewestStart(ctx context.Context, idS
 			&i.UpdatedAt,
 			&i.UserName,
 			&i.Score,
+			&i.CommentsCount,
 		); err != nil {
 			return nil, err
 		}
@@ -384,7 +534,9 @@ posts.updated_at,
 users.user_name,
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = TRUE AND scores.id_post = posts.id_post) -
 (SELECT COUNT(*) FROM reddit_clone.scores WHERE scores.score = FALSE AND scores.id_post = posts.id_post)
-AS score
+AS score,
+(SELECT COUNT(*) FROM reddit_clone.comments WHERE comments.id_post = posts.id_post)
+as comments_count
 FROM reddit_clone.posts AS posts
 JOIN (reddit_clone.users AS users)
 ON (users.id_user = posts.id_user)
@@ -399,13 +551,14 @@ type SubredditByIdListPostsSortScoreHighestParams struct {
 }
 
 type SubredditByIdListPostsSortScoreHighestRow struct {
-	IDPost    int32          `json:"id_post"`
-	Title     string         `json:"title"`
-	Link      *string `json:"link"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt *time.Time   `json:"updated_at"`
-	UserName  string         `json:"user_name"`
-	Score     int32          `json:"score"`
+	IDPost        int32      `json:"id_post"`
+	Title         string     `json:"title"`
+	Link          *string    `json:"link"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     *time.Time `json:"updated_at"`
+	UserName      string     `json:"user_name"`
+	Score         int32      `json:"score"`
+	CommentsCount int64      `json:"comments_count"`
 }
 
 func (q *Queries) SubredditByIdListPostsSortScoreHighest(ctx context.Context, arg SubredditByIdListPostsSortScoreHighestParams) ([]SubredditByIdListPostsSortScoreHighestRow, error) {
@@ -425,6 +578,7 @@ func (q *Queries) SubredditByIdListPostsSortScoreHighest(ctx context.Context, ar
 			&i.UpdatedAt,
 			&i.UserName,
 			&i.Score,
+			&i.CommentsCount,
 		); err != nil {
 			return nil, err
 		}
@@ -450,10 +604,10 @@ WHERE subreddits.url = ?
 `
 
 type SubredditByUrlDetailsRow struct {
-	IDSubreddit int32          `json:"id_subreddit"`
-	Name        string         `json:"name"`
+	IDSubreddit int32   `json:"id_subreddit"`
+	Name        string  `json:"name"`
 	Description *string `json:"description"`
-	UserName    string         `json:"user_name"`
+	UserName    string  `json:"user_name"`
 }
 
 // Client:
@@ -472,26 +626,41 @@ func (q *Queries) SubredditByUrlDetails(ctx context.Context, url string) (Subred
 	return i, err
 }
 
-const voteForPostOrComment = `-- name: VoteForPostOrComment :execresult
+const voteOnComment = `-- name: VoteOnComment :execresult
 INSERT INTO reddit_clone.scores (
-    score, id_post, id_comment, id_user
+    score, id_comment, id_user
 ) VALUES (
-    ?, ?, ?, ?
+    ?, ?, ?
 )
 `
 
-type VoteForPostOrCommentParams struct {
-	Score     bool          `json:"score"`
-	IDPost    *int32 `json:"id_post"`
+type VoteOnCommentParams struct {
+	Score     bool   `json:"score"`
 	IDComment *int32 `json:"id_comment"`
-	IDUser    int32         `json:"id_user"`
+	IDUser    int32  `json:"id_user"`
 }
 
-func (q *Queries) VoteForPostOrComment(ctx context.Context, arg VoteForPostOrCommentParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, voteForPostOrComment,
-		arg.Score,
-		arg.IDPost,
-		arg.IDComment,
-		arg.IDUser,
-	)
+func (q *Queries) VoteOnComment(ctx context.Context, arg VoteOnCommentParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, voteOnComment, arg.Score, arg.IDComment, arg.IDUser)
+}
+
+const voteOnPost = `-- name: VoteOnPost :execresult
+
+INSERT INTO reddit_clone.scores (
+    score, id_post, id_user
+) VALUES (
+    ?, ?, ?
+)
+`
+
+type VoteOnPostParams struct {
+	Score  bool   `json:"score"`
+	IDPost *int32 `json:"id_post"`
+	IDUser int32  `json:"id_user"`
+}
+
+// -------------------------------------------------- --
+// Scores
+func (q *Queries) VoteOnPost(ctx context.Context, arg VoteOnPostParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, voteOnPost, arg.Score, arg.IDPost, arg.IDUser)
 }

@@ -18,6 +18,10 @@ func (c *Controller) setupRoutes(mux *http.ServeMux) *http.ServeMux {
 	mux.HandleFunc("POST /logout", c.logout)
 	mux.HandleFunc("POST /signup", c.signUp)
 	mux.Handle("DELETE /deleteaccount", c.authenticationAndAuthorizationMiddleware(http.HandlerFunc(c.deleteAccount)))
+	mux.Handle("POST /comment", c.authenticationAndAuthorizationMiddleware(http.HandlerFunc(c.createComment)))
+	mux.Handle("POST /comment/score", c.authenticationAndAuthorizationMiddleware(http.HandlerFunc(c.voteOnComment)))
+	mux.Handle("POST /subreddit", c.authenticationAndAuthorizationMiddleware(http.HandlerFunc(c.createCommunity)))
+	mux.Handle("POST /post", c.authenticationAndAuthorizationMiddleware(http.HandlerFunc(c.createPost)))
 
 	return mux
 }
@@ -107,24 +111,14 @@ func (c *Controller) login(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS384, jwt.MapClaims{
-		"id":  dbUser.IDUser,
-		"iat": time.Now().Unix(),
+		"username": dbUser.UserName,
+		"id":       dbUser.IDUser,
+		"iat":      time.Now().UnixMilli(),
 	})
 
 	tokenString, _ := token.SignedString(c.jwtSigningKey)
 
-	// https://github.com/OWASP/Go-SCP/blob/master/dist/go-webapp-scp.pdf page (29)
-	cookie := http.Cookie{
-		Name:     "Auth",
-		Value:    tokenString,
-		Expires:  time.Now().Add(time.Minute * 30),
-		HttpOnly: true,
-		Path:     "/",
-		Domain:   "127.0.0.1",
-		Secure:   false,
-	}
-
-	http.SetCookie(writer, &cookie)
+	sendJsonResponse(TokenCookie{Token: tokenString, Expires: time.Now().Add(time.Hour * 24).UnixMilli()}, 200, writer)
 }
 
 func (c *Controller) signUp(writer http.ResponseWriter, req *http.Request) {
@@ -187,6 +181,133 @@ func (c *Controller) deleteAccount(writer http.ResponseWriter, req *http.Request
 	}
 
 	c.logout(writer, req)
+}
+
+func (c *Controller) createComment(writer http.ResponseWriter, req *http.Request) {
+	// if we are here, then the submitted jwt token has been verified.
+	// as the token is tamper-proof, and it contains the user's id,
+	// we can safely use said id to expedite the users wishes.
+	ctx := req.Context()
+
+	id, ok := ctx.Value("id").(float64)
+	if ok == false {
+		sendErrorResponse(writer, ServiceError{Type: UnexpectedError})
+		return
+	}
+
+	var commentDetails *CommentDetails = &CommentDetails{UserId: int32(id)}
+
+	err := tryParseJson(req, commentDetails)
+	if err != nil {
+		sendErrorResponse(writer, ServiceError{Type: InvalidInput})
+		return
+	}
+
+	err = c.validator.Struct(commentDetails)
+	if err != nil {
+		validationErrors := createValidationErrorsStruct(err.(validator.ValidationErrors))
+		sendErrorResponse(writer, ServiceError{Type: InvalidArgument, ValidationErrors: validationErrors})
+		return
+	}
+
+	insertId, serviceError := c.service.addComment(ctx, commentDetails)
+	if serviceError.Type != NoError {
+		sendErrorResponse(writer, serviceError)
+		return
+	}
+
+	result, serviceError := c.service.getComment(ctx, int32(insertId))
+	if serviceError.Type != NoError {
+		sendErrorResponse(writer, serviceError)
+		return
+	}
+
+	sendJsonResponse(result, 201, writer)
+}
+
+func (c *Controller) voteOnComment(writer http.ResponseWriter, req *http.Request) {
+	// if we are here, then the submitted jwt token has been verified.
+	// as the token is tamper-proof, and it contains the user's id,
+	// we can safely use said id to expedite the users wishes.
+	ctx := req.Context()
+
+	id, ok := ctx.Value("id").(float64)
+	if ok == false {
+		sendErrorResponse(writer, ServiceError{Type: UnexpectedError})
+		return
+	}
+
+	var scoreDetails *ScoreDetails = &ScoreDetails{UserId: int32(id)}
+
+	err := tryParseJson(req, scoreDetails)
+	if err != nil {
+		sendErrorResponse(writer, ServiceError{Type: InvalidInput})
+		return
+	}
+
+	_, serviceError := c.service.voteOnComment(ctx, scoreDetails)
+	if serviceError.Type != NoError {
+		sendErrorResponse(writer, serviceError)
+		return
+	}
+	sendJsonResponse("", 204, writer)
+}
+
+func (c *Controller) createCommunity(writer http.ResponseWriter, req *http.Request) {
+	// if we are here, then the submitted jwt token has been verified.
+	// as the token is tamper-proof, and it contains the user's id,
+	// we can safely use said id to expedite the users wishes.
+	ctx := req.Context()
+
+	id, ok := ctx.Value("id").(float64)
+	if ok == false {
+		sendErrorResponse(writer, ServiceError{Type: UnexpectedError})
+		return
+	}
+
+	var subredditDetails *SubredditDetails = &SubredditDetails{UserId: int32(id)}
+
+	err := tryParseJson(req, subredditDetails)
+	if err != nil {
+		sendErrorResponse(writer, ServiceError{Type: InvalidInput})
+		return
+	}
+
+	_, serviceError := c.service.addCommunity(ctx, subredditDetails)
+	if serviceError.Type != NoError {
+		sendErrorResponse(writer, serviceError)
+		return
+	}
+	sendJsonResponse("", 201, writer)
+}
+
+func (c *Controller) createPost(writer http.ResponseWriter, req *http.Request) {
+	// if we are here, then the submitted jwt token has been verified.
+	// as the token is tamper-proof, and it contains the user's id,
+	// we can safely use said id to expedite the users wishes.
+	ctx := req.Context()
+
+	id, ok := ctx.Value("id").(float64)
+	if ok == false {
+		sendErrorResponse(writer, ServiceError{Type: UnexpectedError})
+		return
+	}
+
+	var postDetails *PostDetails = &PostDetails{UserId: int32(id)}
+
+	err := tryParseJson(req, postDetails)
+	if err != nil {
+		println(err.Error())
+		sendErrorResponse(writer, ServiceError{Type: InvalidInput})
+		return
+	}
+
+	postId, serviceError := c.service.addPost(ctx, postDetails)
+	if serviceError.Type != NoError {
+		sendErrorResponse(writer, serviceError)
+		return
+	}
+	sendJsonResponse(PostId{Id: postId}, 201, writer)
 }
 
 // https://github.com/OWASP/Go-SCP/blob/master/src/session-management/session.go

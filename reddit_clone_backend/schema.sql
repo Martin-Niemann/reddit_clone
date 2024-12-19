@@ -85,6 +85,7 @@ DROP TABLE IF EXISTS `reddit_clone`.`comments`;
 CREATE TABLE IF NOT EXISTS `reddit_clone`.`comments` (
   `id_comment` INT NOT NULL AUTO_INCREMENT,
   `comment` VARCHAR(10000) NOT NULL,
+  `is_toplevel` BOOLEAN NOT NULL,
   `id_post` INT NOT NULL,
   `parent_id` INT NULL,
   `id_user` INT NOT NULL,

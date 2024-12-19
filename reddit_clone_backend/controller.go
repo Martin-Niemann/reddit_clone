@@ -89,7 +89,7 @@ func sendErrorResponse(writer http.ResponseWriter, serviceError ServiceError) {
 
 func tryParseJson[T any](req *http.Request, model *T) error {
 	decoder := json.NewDecoder(req.Body)
-	decoder.DisallowUnknownFields()
+	//decoder.DisallowUnknownFields()
 
 	return decoder.Decode(model)
 }
@@ -113,13 +113,13 @@ func createValidationErrorsStruct(err validator.ValidationErrors) []ValidationEr
 func (c *Controller) authenticationAndAuthorizationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 
-		token := req.CookiesNamed("Auth")[0]
+		token := req.CookiesNamed("auth")[0]
 		if token == nil {
 			sendErrorResponse(writer, ServiceError{Type: MissingAuthCookie})
 			return
 		}
 
-		tokenStruct := Token{Token: token.Value}
+		tokenStruct := ReceivedToken{Token: token.Value}
 		println("the token string is: ", tokenStruct.Token)
 
 		err := c.validator.Struct(tokenStruct)
