@@ -7,15 +7,8 @@ import Form from "next/form";
 import React from "react";
 import { useActionState } from "react";
 
-export default function Create({
-    searchParams,
-}: {
-    searchParams: { [key: string]: string | string[] | undefined }
-}) {
-    const origin = React.use(searchParams).origin
-
+export default function Create() {
     const initialState = {
-        origin: origin,
         success: Boolean,
         data: {
             url: "",

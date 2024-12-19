@@ -37,7 +37,6 @@ export async function tryCreateCommunity(prevState: any, formData: FormData) {
             const descriptionIssues = v.flatten<typeof CreateCommunitySchema>(parseResult.issues).nested?.description
 
             return {
-                origin: prevState.origin,
                 success: false,
                 data: {
                     url: rawFormData.url,
@@ -57,7 +56,6 @@ export async function tryCreateCommunity(prevState: any, formData: FormData) {
 
     if (authCookie == null) {
         return {
-            origin: prevState.origin,
             success: false,
             data: {
                 url: rawFormData.url,
@@ -84,7 +82,6 @@ export async function tryCreateCommunity(prevState: any, formData: FormData) {
         redirect("/c/" + rawFormData.url)
     } else {
         return {
-            origin: prevState.origin,
             success: false,
             data: {
                 url: rawFormData.url,

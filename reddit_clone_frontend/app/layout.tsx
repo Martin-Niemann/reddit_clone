@@ -120,7 +120,7 @@ export default function RootLayout({
                     <Text paddingStart={1}>Sign up</Text>
                   </Flex>
                   <Flex hidden={jwtPayload.id == 0} onClick={() => {
-                    router.push("/c/create/" + "?" + createQueryString("origin", window.location.href.split(window.location.host)[1]))
+                    router.push("/c/create/")
                     changeDrawerState()
                   }
                   } direction={"row"} alignItems={"center"} gap={3} padding={5} paddingInline={6} paddingTop={1} _hover={{ bg: "gray.200" }} _active={{ bg: "gray.200" }}>
